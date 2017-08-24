@@ -1,11 +1,14 @@
 package ekalaya.id.myapplication;
 
 import android.annotation.TargetApi;
+import android.app.ProgressDialog;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
+import android.graphics.Bitmap;
+import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -14,9 +17,13 @@ import android.provider.MediaStore;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.LinearLayout;
 
 import com.github.hiteshsondhi88.libffmpeg.ExecuteBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.FFmpeg;
@@ -27,6 +34,8 @@ import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedExceptio
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener {
 
@@ -44,10 +53,27 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     File DEST_DIR = Environment.getExternalStoragePublicDirectory("img_extractor");
 
+    RVAdapter mAdapter;
+
+    RecyclerView mRecyclerView;
+
+    private ProgressDialog progressDialog;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        mRecyclerView   = (RecyclerView) findViewById(R.id.my_recycler_view);
+        mAdapter        = new RVAdapter(null,this);
+        LinearLayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
+        mLayoutManager.setOrientation(LinearLayout.HORIZONTAL);
+        mRecyclerView.setLayoutManager(mLayoutManager);
+        mRecyclerView.setAdapter(mAdapter);
+
+        progressDialog = new ProgressDialog(this);
+        progressDialog.setTitle(null);
+        progressDialog.setCancelable(false);
 
         if(!DEST_DIR.isDirectory()){
             DEST_DIR.mkdir();
@@ -56,6 +82,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnImport = (Button) findViewById(R.id.btn_import);
         btnImport.setOnClickListener(this);
         loadFFMpegBinary();
+        getheightview();
+    }
+
+    private void getheightview(){
+        DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
+        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
+        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
+        float detH = 150 * displayMetrics.density;
+        Log.d(TAG, "detH : "+detH);
+
     }
 
     private void uploadVideo() {
@@ -142,6 +178,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String filePrefix = "extract_picture";
         String fileExtn = ".jpg";
         String yourRealPath = getPath(MainActivity.this, selectedImageUri);
+        countRes(yourRealPath);
         //String yourRealPath = Uri.parse(selectedImageUri.getPath()).toString();
         //File dir = new File(moviesDir, "VideoEditor");
         int fileNo = 0;
@@ -161,13 +198,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String[] complexCommand = {
                 "-y",
                 "-i", yourRealPath,
-                "-an", "-r", "1/10",
+                "-an", "-r", "1/0.1",
 //                "-ss", "" + startMs / 1000,
 //                "-t", "" + (endMs - startMs) / 1000,
                 dest.getAbsolutePath()};
 
-        execFFmpegBinary(complexCommand);
+        //execFFmpegBinary(complexCommand);
 
+    }
+
+    private void countRes(String filePath){
+        MediaMetadataRetriever retriever = new  MediaMetadataRetriever();
+        Bitmap bmp = null;
+        int vh = 0;
+        int vw = 0;
+        retriever.setDataSource(filePath);
+        bmp = retriever.getFrameAtTime();
+        vh = bmp.getHeight();
+        vw = bmp.getWidth();
+
+        float imgh = 210;
+        float imgw = imgh / vh * vw;
+
+        DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
+        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
+        float dpWidth = displayMetrics.widthPixels;
+        double numimg = Math.ceil(dpWidth / imgw);
+        Log.d(TAG,"---------------------------img res : "+imgw+"x"+imgh);
+        Log.d(TAG,"---------------------------img num : "+(int)numimg);
+
+
+        String time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+        int VideoDuration = Integer.parseInt(time);// This will give time in millesecond
+        double VideoDurationsec = Math.ceil(VideoDuration / 1000);
+        double persec = VideoDurationsec / numimg;
+        Log.d(TAG,"---------------------------VideoDuration : "+VideoDurationsec);
     }
 
     private void execFFmpegBinary(final String[] command) {
@@ -199,15 +264,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 @Override
                 public void onProgress(String s) {
                     Log.d(TAG, "Started command : ffmpeg " + command);
-                    //progressDialog.setMessage("progress : " + s);
+                    progressDialog.setMessage("progress : " + s);
                     Log.d(TAG, "progress : " + s);
                 }
 
                 @Override
                 public void onStart() {
                     Log.d(TAG, "Started command : ffmpeg " + command);
-                    //progressDialog.setMessage("Processing...");
-                    //progressDialog.show();
+                    progressDialog.setMessage("Processing...");
+                    progressDialog.show();
                 }
 
                 @Override
@@ -220,7 +285,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     }
 //                    Log.d(TAG, "Finished command : ffmpeg " + filePath);
 //                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.parse("file://" + Environment.getExternalStorageDirectory())));
-                    //progressDialog.dismiss();
+                    progressDialog.dismiss();
+                    populateFiles();
 //                    File filetoscan = new File(DEST_DIR.getAbsolutePath());
 //                    Intent sintent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
 //                    sintent.setData(Uri.fromFile(filetoscan));
@@ -344,10 +410,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             for (File c : f.listFiles()) {
                 delete(c);
             }
-        } else if (f.getAbsolutePath().endsWith("FIR")) {
+        } else {
             if (!f.delete()) {
                 new FileNotFoundException("Failed to delete file: " + f);
             }
         }
+    }
+
+    private void populateFiles(){
+        List<File> listfile = new ArrayList<File>();
+        for (File c : DEST_DIR.listFiles()) {
+            if(c.getAbsolutePath().endsWith(".jpg")){
+                listfile.add(c);
+            }
+        }
+        mAdapter.setFiles(listfile);
     }
 }
