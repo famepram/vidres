@@ -18,6 +18,6 @@
         android:id="@+id/my_recycler_view"
         android:scrollbars="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="150dp"/>
+        android:layout_height="70dp"/>
 
 </RelativeLayout>

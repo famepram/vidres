@@ -25,6 +25,8 @@ public class RVAdapter extends RecyclerView.Adapter<RVAdapter.RVAdapterHolder>{
 
     private Context ctx;
 
+    int width_img = 108;
+
     @Override
     public RVAdapterHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View itemView = LayoutInflater.from(parent.getContext()).inflate(R.layout.rv_item,parent,false);
@@ -47,14 +49,21 @@ public class RVAdapter extends RecyclerView.Adapter<RVAdapter.RVAdapterHolder>{
         ImageView img;
         public RVAdapterHolder(View itemView) {
             super(itemView);
-            DisplayMetrics displayMetrics = ctx.getResources().getDisplayMetrics();
-            float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-            float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
-            float perImg  = dpWidth / 10* displayMetrics.density;
-            Log.d("TESTING", "dpWidth : "+dpWidth);
+//            DisplayMetrics displayMetrics = ctx.getResources().getDisplayMetrics();
+//            float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
+//            float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
+//            float perImg  = dpWidth / 10* displayMetrics.density;
+//            Log.d("TESTING", "dpWidth : "+dpWidth);
             img = (ImageView) itemView.findViewById(R.id.iv_rv_item);
-            img.getLayoutParams().width = (int)perImg;
+            img.getLayoutParams().width =  width_img;
+            img.getLayoutParams().height = 210;
+            Log.d("TESTING", "dpWidth : "+width_img);
         }
+    }
+
+
+    public void setWidthImg(int w){
+        width_img = w;
     }
 
     public RVAdapter(List<File> listfiles, Context ctx){

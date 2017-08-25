@@ -59,17 +59,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private ProgressDialog progressDialog;
 
+    private double CAPTURE_PERSEC;
+
+    private int WIDTH_PER_IMG;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mRecyclerView   = (RecyclerView) findViewById(R.id.my_recycler_view);
-        mAdapter        = new RVAdapter(null,this);
-        LinearLayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
-        mLayoutManager.setOrientation(LinearLayout.HORIZONTAL);
-        mRecyclerView.setLayoutManager(mLayoutManager);
-        mRecyclerView.setAdapter(mAdapter);
+
 
         progressDialog = new ProgressDialog(this);
         progressDialog.setTitle(null);
@@ -82,16 +81,56 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         btnImport = (Button) findViewById(R.id.btn_import);
         btnImport.setOnClickListener(this);
         loadFFMpegBinary();
-        getheightview();
+
+        sampleFiles();
     }
 
-    private void getheightview(){
-        DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
-        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-        float dpWidth = displayMetrics.widthPixels / displayMetrics.density;
-        float detH = 150 * displayMetrics.density;
-        Log.d(TAG, "detH : "+detH);
+    private void sampleFiles(){
+        List<File> listfile = new ArrayList<File>();
+        for (File c : DEST_DIR.listFiles()) {
+            if(c.getAbsolutePath().endsWith(".jpg")){
+                Log.d(TAG,"absolute----------"+c.getAbsolutePath());
+                listfile.add(c);
+            }
+        }
 
+        mRecyclerView   = (RecyclerView) findViewById(R.id.my_recycler_view);
+        mAdapter        = new RVAdapter(listfile,this);
+        LinearLayoutManager mLayoutManager = new LinearLayoutManager(getApplicationContext());
+        mLayoutManager.setOrientation(LinearLayout.HORIZONTAL);
+        mRecyclerView.setLayoutManager(mLayoutManager);
+        mRecyclerView.setAdapter(mAdapter);
+    }
+
+
+    private void countRes(String filePath){
+        MediaMetadataRetriever retriever = new  MediaMetadataRetriever();
+        Bitmap bmp = null;
+        int vh = 0;
+        int vw = 0;
+        retriever.setDataSource(filePath);
+        bmp = retriever.getFrameAtTime();
+        vh = bmp.getHeight();
+        vw = bmp.getWidth();
+
+        float imgh = 210;
+        float imgw = imgh / vh * vw;
+        WIDTH_PER_IMG = (int) Math.ceil(imgw);
+        mAdapter.setWidthImg(WIDTH_PER_IMG);
+
+        DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
+        float dpWidth = displayMetrics.widthPixels;
+        double numimg = Math.ceil(dpWidth / imgw);
+//        Log.d(TAG,"---------------------------img res : "+imgw+"x"+imgh);
+//        Log.d(TAG,"---------------------------img num : "+(int)numimg);
+
+
+        String time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+        int VideoDuration = Integer.parseInt(time);// This will give time in millesecond
+//        double VideoDurationsec = Math.ceil(VideoDuration / 1000);
+//        CAPTURE_PERSEC  = VideoDurationsec / numimg;
+        Log.d(TAG,"---------------------------VideoDuration : "+VideoDuration);
+//        Log.d(TAG,"---------------------------CapturePersec : "+CAPTURE_PERSEC);
     }
 
     private void uploadVideo() {
@@ -178,17 +217,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String filePrefix = "extract_picture";
         String fileExtn = ".jpg";
         String yourRealPath = getPath(MainActivity.this, selectedImageUri);
-        countRes(yourRealPath);
-        //String yourRealPath = Uri.parse(selectedImageUri.getPath()).toString();
-        //File dir = new File(moviesDir, "VideoEditor");
-        int fileNo = 0;
-//        while (dir.exists()) {
-//            fileNo++;
-//            dir = new File(moviesDir, "VideoEditor" + fileNo);
-//
-//        }
-//        dir.mkdir();
-        //filePath = dir.getAbsolutePath();
+        //countRes(yourRealPath);
         File dest = new File(DEST_DIR, filePrefix + "%03d" + fileExtn);
         filePath = dest.getAbsolutePath();
 
@@ -198,42 +227,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         String[] complexCommand = {
                 "-y",
                 "-i", yourRealPath,
-                "-an", "-r", "1/0.1",
+                "-an", "-r", "1/0.12",
 //                "-ss", "" + startMs / 1000,
 //                "-t", "" + (endMs - startMs) / 1000,
                 dest.getAbsolutePath()};
 
-        //execFFmpegBinary(complexCommand);
+        execFFmpegBinary(complexCommand);
 
     }
 
-    private void countRes(String filePath){
-        MediaMetadataRetriever retriever = new  MediaMetadataRetriever();
-        Bitmap bmp = null;
-        int vh = 0;
-        int vw = 0;
-        retriever.setDataSource(filePath);
-        bmp = retriever.getFrameAtTime();
-        vh = bmp.getHeight();
-        vw = bmp.getWidth();
 
-        float imgh = 210;
-        float imgw = imgh / vh * vw;
-
-        DisplayMetrics displayMetrics = getApplicationContext().getResources().getDisplayMetrics();
-        float dpHeight = displayMetrics.heightPixels / displayMetrics.density;
-        float dpWidth = displayMetrics.widthPixels;
-        double numimg = Math.ceil(dpWidth / imgw);
-        Log.d(TAG,"---------------------------img res : "+imgw+"x"+imgh);
-        Log.d(TAG,"---------------------------img num : "+(int)numimg);
-
-
-        String time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
-        int VideoDuration = Integer.parseInt(time);// This will give time in millesecond
-        double VideoDurationsec = Math.ceil(VideoDuration / 1000);
-        double persec = VideoDurationsec / numimg;
-        Log.d(TAG,"---------------------------VideoDuration : "+VideoDurationsec);
-    }
 
     private void execFFmpegBinary(final String[] command) {
         try {
@@ -420,10 +423,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private void populateFiles(){
         List<File> listfile = new ArrayList<File>();
         for (File c : DEST_DIR.listFiles()) {
+            Log.d(TAG,"absolute----------"+c.getAbsolutePath());
             if(c.getAbsolutePath().endsWith(".jpg")){
                 listfile.add(c);
             }
         }
         mAdapter.setFiles(listfile);
+        mAdapter.notifyDataSetChanged();
     }
 }
